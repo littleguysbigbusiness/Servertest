@@ -14,5 +14,5 @@ RUN mkdir -p /root/.config/rclone /data
 
 # 4. Boot configuration script
 CMD echo "$RCLONE_CONFIG_DATA" > /root/.config/rclone/rclone.conf && \
-    rclone mount proton: /data --vfs-cache-mode full --allow-other & \
-    filebrowser -r /data --noauth -p $PORT -a 0.0.0.0
+    rclone serve http proton: --addr 127.0.0.1:8080 & \
+    filebrowser -r http://127.0.0.1:8080 --noauth -p $PORT -a 0.0.0.0
