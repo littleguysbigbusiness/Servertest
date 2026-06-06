@@ -1,7 +1,7 @@
 FROM alpine:latest
 
-# 1. Install rclone, curl, and required system tools for Plex
-RUN apk add --no-cache rclone curl ca-certificates openrc dummy-vdo
+# 1. Install rclone, curl, and lightweight Alpine compatibility tools for Plex
+RUN apk add --no-cache rclone curl ca-certificates gcompat libstdc++
 
 # 2. Download and extract official Plex Media Server binaries
 RUN curl -L "https://plex.tv/downloads/latest/1?channel=8&build=linux-x86_64&distro=debian" -o plex.tar.bz2 && \
