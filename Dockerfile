@@ -1,6 +1,6 @@
 FROM plexinc/pms-docker:latest
 
-# 1. Install prerequisites, Python libraries, FUSE, and the latest Rclone
+# 1. Install system tools, Python, FUSE mount dependencies, and the latest Rclone
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
@@ -17,7 +17,7 @@ RUN pip3 install --no-cache-dir --break-system-packages gspread google-auth
 # 2. Create standard folder paths
 RUN mkdir -p /config/.config/rclone /config/.config/gdrive /data/media /app /custom-services.d
 
-# 3. Write the Google Sheet token reader script
+# 3. Write the Google Sheet reader script targeting A1
 RUN echo 'import gspread\n\
 import os\n\
 from google.oauth2.service_account import Credentials\n\
@@ -27,14 +27,14 @@ try:\n\
     creds = Credentials.from_service_account_file("/config/.config/gdrive/sa.json", scopes=scopes)\n\
     client = gspread.authorize(creds)\n\
     sheet = client.open_by_key(os.environ["GOOGLE_SHEET_ID"]).sheet1\n\
-    all_values = sheet.get_all_values()\n\
-    if all_values:\n\
-        latest_token = all_values[-1][0].strip()\n\
-        print(f"SUCCESS: Found latest token: {latest_token}")\n\
+    # Look directly at cell A1 (Row 1, Column 1)\n\
+    latest_token = sheet.cell(1, 1).value.strip()\n\
+    if latest_token:\n\
+        print(f"SUCCESS: Found latest token in A1: {latest_token}")\n\
         with open("/app/token.txt", "w") as f:\n\
             f.write(latest_token)\n\
 except Exception as e:\n\
-    print(f"ERROR reading sheet: {e}")\n\
+    print(f"ERROR reading sheet cell A1: {e}")\n\
 ' > /app/get_token.py
 
 # 4. Create the initialization service script inside Plex's official startup directory
@@ -49,8 +49,8 @@ echo "$RCLONE_CONFIG_DATA" > /config/.config/rclone/rclone.conf\n\
 # Fetch the claim token dynamically from your sheet\n\
 python3 /app/get_token.py\n\
 if [ -f /app/token.txt ]; then\n\
-    export PLEX_CLAIM=$(cat /app/token.txt)\n\
-    # Inject it directly into the official environment zone\n\
-    echo "export PLEX_CLAIM=\"$PLEX_CLAIM\"" >> /etc/profile.d/plex.sh\n\
+    mkdir -p /etc/services.d/plex/env\n\
+    cat /app/token.txt > /etc/services.d/plex/env/PLEX_CLAIM\n\
+    echo "SUCCESS: Injected claim token into Plex core configuration environment."\n\
 fi\n\
 ' > /custom-services.d/10-rclone-gspread && chmod +x /custom-services.d/10-rclone-gspread
