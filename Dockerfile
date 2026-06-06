@@ -1,10 +1,13 @@
 FROM alpine:latest
 
-# 1. Install rclone, curl (to download files), and fuse3
-RUN apk add --no-cache rclone curl ca-certificates fuse3
+# 1. Install rclone, curl, tar (to unpack the file), and fuse3
+RUN apk add --no-cache rclone curl tar ca-certificates fuse3
 
-# 2. Download and install Filebrowser directly from their official script
-RUN curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | sh
+# 2. Download and install Filebrowser directly (Linux 64-bit version)
+RUN curl -fsSL https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz -o filebrowser.tar.gz && \
+    tar -xzf filebrowser.tar.gz && \
+    mv filebrowser /usr/local/bin/filebrowser && \
+    rm filebrowser.tar.gz
 
 # 3. Create necessary internal folders
 RUN mkdir -p /root/.config/rclone /data
