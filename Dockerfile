@@ -1,6 +1,6 @@
 FROM plexinc/pms-docker:latest
 
-# 1. Install Rclone, Python, and dependencies via Ubuntu's package manager (Plex base image uses Ubuntu)
+# 1. Install Rclone, Python, and system prerequisites
 RUN apt-get update && apt-get install -y --no-install-recommends \
     rclone \
     curl \
@@ -9,13 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Python packages for Google Sheets automation
-RUN pip3 install --no-cache-dir gspread google-auth
+# 2. Install automation libraries (Bypassing PEP 668 system block safely)
+RUN pip3 install --no-cache-dir --break-system-packages gspread google-auth
 
-# 3. Create necessary data and configuration directories
+# 3. Establish internal data and script tracking directories
 RUN mkdir -p /root/.config/rclone /root/.config/gdrive /app
 
-# 4. Create the automation script that reads your Google Sheet
+# 4. Create the automated Google Sheet reader
 RUN echo 'import gspread\n\
 import os\n\
 from google.oauth2.service_account import Credentials\n\
@@ -39,10 +39,10 @@ except Exception as e:\n\
     print(f"ERROR reading sheet: {e}")\n\
 ' > /app/get_token.py
 
-# 5. Route Traffic to Plex's default internal port
+# 5. Open Plex routing interface port
 EXPOSE 32400
 
-# 6. Override the startup sequence: Saves secrets, updates the claim token variable, and hands off to Plex
+# 6. Service boot sequence: Mount drive, pull the sheet token, and launch Plex
 CMD echo "$GDRIVE_SA_JSON" > /root/.config/gdrive/sa.json && \
     echo "$RCLONE_CONFIG_DATA" > /root/.config/rclone/rclone.conf && \
     rclone serve webdav gdrive: --addr 127.0.0.1:8080 & \
