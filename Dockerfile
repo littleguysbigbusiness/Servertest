@@ -1,12 +1,18 @@
 FROM alpine:latest
 
-# 1. Install rclone, curl, certificates, and native media server components
-RUN apk add --no-cache rclone curl ca-certificates jellyfin jellyfin-web ffmpeg
+# 1. Install rclone, curl, certificates, Jellyfin backend, and processing tools
+RUN apk add --no-cache rclone curl ca-certificates jellyfin ffmpeg
 
-# 2. Create standard data storage directories
+# 2. Download and unpack the official pre-compiled Web Client build directly
+RUN mkdir -p /usr/share/jellyfin-web && \
+    curl -L "https://github.com/jellyfin/jellyfin-web/archive/refs/tags/v10.10.5.tar.gz" -o web.tar.gz && \
+    tar -xzf web.tar.gz -C /usr/share/jellyfin-web --strip-components=1 && \
+    rm web.tar.gz
+
+# 3. Establish internal data directories
 RUN mkdir -p /root/.config/rclone /data/jellyfin/config /data/jellyfin/cache
 
-# 3. Boot script: Explicitly declares the web client path using the --webdir flag
+# 4. Launch script: Runs the clean cloud stream and hooks the web player directory
 CMD echo "$RCLONE_CONFIG_DATA" > /root/.config/rclone/rclone.conf && \
     pkill rclone || true && \
     rclone serve webdav proton: --addr 127.0.0.1:8080 & \
