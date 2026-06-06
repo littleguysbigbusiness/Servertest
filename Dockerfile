@@ -1,20 +1,21 @@
 FROM plexinc/pms-docker:latest
 
-# 1. Install system tools, Python, and the absolute latest Rclone (for Proton support)
+# 1. Install system tools, Python, FUSE mount dependencies, and the latest Rclone binary
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     unzip \
     python3 \
     python3-pip \
+    fuse3 \
     && curl https://rclone.org/install.sh | bash \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install Python packages for Google Sheets automation
+# 2. Install automation libraries
 RUN pip3 install --no-cache-dir --break-system-packages gspread google-auth
 
-# 3. Create required directories inside Plex's config zone and media path
+# 3. Establish storage locations inside Plex's config zone and media path
 RUN mkdir -p /config/.config/rclone /config/.config/gdrive /data/media /app
 
 # 4. Write the Google Sheet reader script
