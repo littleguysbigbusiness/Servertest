@@ -1,6 +1,6 @@
 FROM plexinc/pms-docker:latest
 
-# 1. Install system tools, Python, FUSE mount dependencies, and the latest Rclone binary
+# 1. Install prerequisites, Python libraries, FUSE, and the latest Rclone
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
@@ -12,13 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install automation libraries
 RUN pip3 install --no-cache-dir --break-system-packages gspread google-auth
 
-# 3. Establish storage locations inside Plex's config zone and media path
-RUN mkdir -p /config/.config/rclone /config/.config/gdrive /data/media /app
+# 2. Create standard folder paths
+RUN mkdir -p /config/.config/rclone /config/.config/gdrive /data/media /app /custom-services.d
 
-# 4. Write the Google Sheet reader script
+# 3. Write the Google Sheet token reader script
 RUN echo 'import gspread\n\
 import os\n\
 from google.oauth2.service_account import Credentials\n\
@@ -38,24 +37,20 @@ except Exception as e:\n\
     print(f"ERROR reading sheet: {e}")\n\
 ' > /app/get_token.py
 
-# 5. Create the master boot script
-RUN echo '#!/bin/bash\n\
+# 4. Create the initialization service script inside Plex's official startup directory
+RUN echo '#!/bin/with-contenv bash\n\
+# Write out cloud configurations\n\
 echo "$GDRIVE_SA_JSON" > /config/.config/gdrive/sa.json\n\
 echo "$RCLONE_CONFIG_DATA" > /config/.config/rclone/rclone.conf\n\
 \n\
-# Mount Proton Drive directly to Plex media folder\n\
+# Mount Proton Drive to the media directory\n\
 /usr/bin/rclone mount gdrive: /data/media --allow-other --vfs-cache-mode writes &\n\
 \n\
-# Grab the token from Google Sheets and export it to Plex\n\
+# Fetch the claim token dynamically from your sheet\n\
 python3 /app/get_token.py\n\
 if [ -f /app/token.txt ]; then\n\
     export PLEX_CLAIM=$(cat /app/token.txt)\n\
+    # Inject it directly into the official environment zone\n\
+    echo "export PLEX_CLAIM=\"$PLEX_CLAIM\"" >> /etc/profile.d/plex.sh\n\
 fi\n\
-\n\
-# Wait a moment for the mount to stabilize, then hand over to Plex\n\
-sleep 5\n\
-exec /init\n\
-' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
-EXPOSE 32400
-ENTRYPOINT ["/app/entrypoint.sh"]
+' > /custom-services.d/10-rclone-gspread && chmod +x /custom-services.d/10-rclone-gspread
