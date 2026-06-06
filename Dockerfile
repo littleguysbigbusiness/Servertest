@@ -1,13 +1,15 @@
 FROM alpine:latest
 
-# 1. Install rclone, curl, and lightweight Alpine compatibility tools for Plex
-RUN apk add --no-cache rclone curl ca-certificates gcompat libstdc++
+# 1. Install rclone, curl, certificates, and tools to unpack Debian packages
+RUN apk add --no-cache rclone curl ca-certificates gcompat libstdc++ binutils
 
-# 2. Download and extract official Plex Media Server binaries
-RUN curl -L "https://plex.tv/downloads/latest/1?channel=8&build=linux-x86_64&distro=debian" -o plex.tar.bz2 && \
+# 2. Download official Plex Debian package and manually extract the server files
+RUN curl -L "https://downloads.plex.tv/plex-media-server-new/1.43.1.10611-1e34174b1/debian/plexmediaserver_1.43.1.10611-1e34174b1_amd64.deb" -o plex.deb && \
+    ar x plex.deb && \
+    tar -xf data.tar.xz && \
     mkdir -p /usr/lib/plexmediaserver && \
-    tar -xjf plex.tar.bz2 -C /usr/lib/plexmediaserver --strip-components=1 && \
-    rm plex.tar.bz2
+    mv usr/lib/plexmediaserver/* /usr/lib/plexmediaserver/ && \
+    rm -rf plex.deb control.tar.gz data.tar.xz debian-binary usr lib
 
 # 3. Create config and media directories
 RUN mkdir -p /root/.config/rclone /data/plex_support
