@@ -29,3 +29,10 @@ exec /usr/bin/rclone serve webdav gdrive: \
 EOF
 
 RUN chmod +x /etc/cont-init.d/10-rclone-setup
+docker run -d \
+  --network=host \
+  -e PLEX_CLAIM=claim-claim-koM6FGZDn9S1C_9ycCtz \
+  -e ADVERTISE_IP=http://YOUR_SERVER_IP:32400/ \
+  -e RCLONE_CONFIG_DATA="$(cat ~/.config/rclone/rclone.conf)" \
+  -v /path/to/config:/config \
+  your-image-name
