@@ -20,7 +20,7 @@ echo "$RCLONE_CONFIG_DATA" > /config/.config/rclone/rclone.conf\n\
 # Fire up the background WebDAV server to stream Proton Drive files\n\
 /usr/bin/rclone serve webdav gdrive: --addr 127.0.0.1:8080 --user plex --pass plexpass &\n\
 \n\
-# Force network permissions directly into the underlying preference file\n\
+# Inject network routing and trusted permissions directly into the underlying preference file\n\
 mkdir -p "/config/Library/Application Support/Plex Media Server"\n\
-echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><Preferences allowedNetworks=\"0.0.0.0/0\"/>" > "/config/Library/Application Support/Plex Media Server/Preferences.xml"\n\
+echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><Preferences allowedNetworks=\"0.0.0.0/0\" customConnections=\"https://servertest-y4jy.onrender.com/\"/>" > "/config/Library/Application Support/Plex Media Server/Preferences.xml"\n\
 ' > /etc/cont-init.d/10-rclone-setup && chmod +x /etc/cont-init.d/10-rclone-setup
