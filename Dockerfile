@@ -1,28 +1,30 @@
 FROM plexinc/pms-docker:latest
 
-# 1. Install Rclone, Python, and system prerequisites
+# 1. Install system tools, Python, and the absolute latest Rclone (for Proton support)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    rclone \
     curl \
     ca-certificates \
+    unzip \
     python3 \
     python3-pip \
+    && curl https://rclone.org/install.sh | bash \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install automation libraries
+# 2. Install Python packages for Google Sheets automation
 RUN pip3 install --no-cache-dir --break-system-packages gspread google-auth
 
-# 3. Establish storage locations across both root and config spaces
-RUN mkdir -p /root/.config/rclone /root/.config/gdrive /config/.config/rclone /app
+# 3. Create required directories inside Plex's config zone and media path
+RUN mkdir -p /config/.config/rclone /config/.config/gdrive /data/media /app
 
-# 4. Create the automated Google Sheet reader
+# 4. Write the Google Sheet reader script
 RUN echo 'import gspread\n\
 import os\n\
 from google.oauth2.service_account import Credentials\n\
 \n\
 try:\n\
     scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]\n\
-    creds = Credentials.from_service_account_file("/root/.config/gdrive/sa.json", scopes=scopes)\n\
+    creds = Credentials.from_service_account_file("/config/.config/gdrive/sa.json", scopes=scopes)\n\
     client = gspread.authorize(creds)\n\
     sheet = client.open_by_key(os.environ["GOOGLE_SHEET_ID"]).sheet1\n\
     all_values = sheet.get_all_values()\n\
@@ -35,15 +37,24 @@ except Exception as e:\n\
     print(f"ERROR reading sheet: {e}")\n\
 ' > /app/get_token.py
 
-# 5. Open Plex routing interface port
-EXPOSE 32400
+# 5. Create the master boot script
+RUN echo '#!/bin/bash\n\
+echo "$GDRIVE_SA_JSON" > /config/.config/gdrive/sa.json\n\
+echo "$RCLONE_CONFIG_DATA" > /config/.config/rclone/rclone.conf\n\
+\n\
+# Mount Proton Drive directly to Plex media folder\n\
+/usr/bin/rclone mount gdrive: /data/media --allow-other --vfs-cache-mode writes &\n\
+\n\
+# Grab the token from Google Sheets and export it to Plex\n\
+python3 /app/get_token.py\n\
+if [ -f /app/token.txt ]; then\n\
+    export PLEX_CLAIM=$(cat /app/token.txt)\n\
+fi\n\
+\n\
+# Wait a moment for the mount to stabilize, then hand over to Plex\n\
+sleep 5\n\
+exec /init\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
-# 6. Service boot sequence: Sanitizes and saves secrets, mounts drive, pulls the token, and launches Plex
-CMD python3 -c 'import os, json; data=os.environ.get("GDRIVE_SA_JSON","{}"); print(json.dumps(json.loads(data)))' > /root/.config/gdrive/sa.json 2>/dev/null || echo "$GDRIVE_SA_JSON" > /root/.config/gdrive/sa.json && \
-    echo "$RCLONE_CONFIG_DATA" > /root/.config/rclone/rclone.conf && \
-    cp /root/.config/rclone/rclone.conf /config/.config/rclone/rclone.conf && \
-    rclone serve webdav gdrive: --addr 127.0.0.1:8080 & \
-    python3 /app/get_token.py && \
-    if [ -f /app/token.txt ]; then export PLEX_CLAIM=$(cat /app/token.txt); fi && \
-    sleep 2 && \
-    exec /init
+EXPOSE 32400
+ENTRYPOINT ["/app/entrypoint.sh"]
